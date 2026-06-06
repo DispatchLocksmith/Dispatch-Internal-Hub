@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dispatcher's Internal Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.9.0/dist/tabler-icons.min.css">
+<style>
+:root {
+  /* dark sidebar */
+  --sb-bg:       #0e1117;
+  --sb-bg2:      #161b25;
+  --sb-border:   rgba(255,255,255,0.07);
+  --sb-text:     #c8cdd8;
+  --sb-text2:    #6b7280;
+  --sb-active-bg:#1e2d45;
+  --sb-active:   #60a5fa;
+  --sb-hover:    rgba(255,255,255,0.05);
+  /* main area — dark */
+  --bg:          #0d1117;
+  --surface:     #161b22;
+  --surface2:    #1c2128;
+  --border:      rgba(255,255,255,0.07);
+  --border2:     rgba(255,255,255,0.13);
+  --text:        #e6edf3;
+  --text2:       #8b949e;
+  --text3:       #484f58;
+  --accent:      #60a5fa;
+  --accent-l:    rgba(96,165,250,0.12);
+  --radius:      12px;
+  --radius-lg:   16px;
+  --sidebar-w:   248px;
+  --font: 'Plus Jakarta Sans', sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;}
+body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;overflow:hidden;}
+
+/* ── Layout ── */
+.layout{display:flex;height:100vh;}
+
+/* ══════════════════════════════
+   SIDEBAR  (dark, cute)
+══════════════════════════════ */
+.sidebar{
+  width:var(--sidebar-w);
+  background:var(--sb-bg);
+  border-right:1px solid var(--sb-border);
+  display:flex;flex-direction:column;
+  flex-shrink:0;overflow-y:auto;overflow-x:hidden;
+}
+.sidebar::-webkit-scrollbar{width:3px;}
+.sidebar::-webkit-scrollbar-thumb{background:#1e2533;border-radius:4px;}
+
+/* Logo */
+.sb-logo{
+  padding:20px 16px 16px;
+  border-bottom:1px solid var(--sb-border);
+  display:flex;align-items:center;gap:11px;
+}
+.sb-logo-icon{
+  width:36px;height:36px;border-radius:10px;
+  background:linear-gradient(135deg,#3b5bdb,#60a5fa);
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;color:#fff;flex-shrink:0;
+  box-shadow:0 0 12px rgba(96,165,250,0.35);
+}
+.sb-logo-text{font-size:14px;font-weight:700;letter-spacing:-0.3px;color:#f0f2f8;}
+.sb-logo-sub{font-size:10px;color:var(--sb-text2);margin-top:1px;letter-spacing:0.3px;}
+
+/* Section label */
+.sb-section{padding:12px 0 2px;}
+.sb-label{
+  font-size:9.5px;font-weight:700;color:var(--sb-text2);
+  text-transform:uppercase;letter-spacing:1.2px;
+  padding:0 16px 5px;display:flex;align-items:center;gap:7px;
+}
+.sb-label::after{content:'';flex:1;height:1px;background:var(--sb-border);}
+
+/* Nav item */
+.sb-item{
+  display:flex;align-items:center;gap:9px;
+  padding:8px 16px;cursor:pointer;
+  color:var(--sb-text);font-size:13px;font-weight:500;
+  transition:all 0.14s;user-select:none;position:relative;
+  border-radius:0;
+}
+.sb-item i.nav-icon{
+  font-size:16px;flex-shrink:0;
+  width:28px;height:28px;border-radius:7px;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,0.05);
+  transition:all 0.14s;
+}
+.sb-item:hover{background:var(--sb-hover);color:#e2e8f0;}
+.sb-item:hover i.nav-icon{background:rgba(255,255,255,0.09);}
+.sb-item.active{background:var(--sb-active-bg);color:var(--sb-active);}
+.sb-item.active i.nav-icon{background:rgba(96,165,250,0.15);color:var(--sb-active);}
+.sb-item.active::before{
+  content:'';position:absolute;left:0;top:6px;bottom:6px;
+  width:3px;background:var(--sb-active);border-radius:0 3px 3px 0;
+}
+.sb-chevron{margin-left:auto;font-size:11px;transition:transform 0.22s;color:var(--sb-text2);}
+.sb-item.open .sb-chevron{transform:rotate(90deg);}
+
+/* Sub items */
+.sb-children{overflow:hidden;max-height:0;transition:max-height 0.28s ease;}
+.sb-children.open{max-height:500px;}
+.sb-sub{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 16px 6px 42px;cursor:pointer;
+  color:var(--sb-text2);font-size:12px;font-weight:500;
+  transition:all 0.13s;user-select:none;
+}
+.sb-sub:hover{color:#c8d0e0;background:var(--sb-hover);}
+.sb-sub.active{color:var(--sb-active);}
+.sb-sub-dot{
+  width:5px;height:5px;border-radius:50%;
+  background:currentColor;opacity:0.5;flex-shrink:0;
+}
+.sb-sub.active .sb-sub-dot{opacity:1;}
+
+/* Bottom user section */
+.sb-user{
+  margin-top:auto;
+  padding:14px 16px;
+  border-top:1px solid var(--sb-border);
+  display:flex;align-items:center;gap:10px;
+}
+.sb-avatar{
+  width:30px;height:30px;border-radius:50%;
+  background:linear-gradient(135deg,#3b5bdb,#60a5fa);
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:700;color:#fff;flex-shrink:0;
+}
+.sb-user-name{font-size:12px;font-weight:600;color:#e0e4f0;}
+.sb-user-role{font-size:10px;color:var(--sb-text2);}
+
+/* ══════════════════════════════
+   MAIN
+══════════════════════════════ */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+
+/* Topbar */
+.topbar{
+  height:52px;background:var(--surface);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;
+  padding:0 24px;flex-shrink:0;
+}
+.bc{display:flex;align-items:center;gap:6px;flex:1;}
+.bc-parent{font-size:12px;color:var(--text3);}
+.bc-sep{color:var(--text3);font-size:12px;}
+.bc-current{font-size:14px;font-weight:600;color:var(--text);}
+.tb-time{font-size:12px;color:var(--text3);font-weight:500;}
+
+/* Content */
+.content{flex:1;overflow-y:auto;padding:28px 26px 48px;}
+.content::-webkit-scrollbar{width:4px;}
+.content::-webkit-scrollbar-thumb{background:#30363d;border-radius:4px;}
+
+/* View toggle */
+.view{display:none;}
+.view.active{display:block;}
+
+/* Page header */
+.page-header{margin-bottom:26px;}
+.page-title{font-size:22px;font-weight:700;letter-spacing:-0.5px;margin-bottom:3px;}
+.page-sub{font-size:13px;color:var(--text2);}
+
+/* Section group */
+.section-group{margin-bottom:32px;}
+.section-heading{
+  font-size:11px;font-weight:700;color:var(--text3);
+  text-transform:uppercase;letter-spacing:1px;
+  margin-bottom:13px;display:flex;align-items:center;gap:8px;
+}
+.section-heading::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* Card grid */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;}
+
+/* Link card */
+.card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  overflow:hidden;cursor:pointer;
+  transition:all 0.18s;
+  display:flex;flex-direction:column;
+  text-decoration:none;color:inherit;position:relative;
+}
+.card:hover{border-color:rgba(96,165,250,0.3);transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,0,0,0.35);}
+.card-thumb{
+  width:100%;height:108px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:42px;position:relative;overflow:hidden;
+}
+.card-thumb::after{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(circle at 70% 30%,rgba(255,255,255,0.1),transparent 60%);
+}
+.card-body{padding:13px 14px 15px;flex:1;}
+.card-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px;}
+.card-sub{font-size:11px;color:var(--text3);line-height:1.4;}
+.card-ext{
+  position:absolute;bottom:10px;right:10px;
+  display:flex;align-items:center;gap:3px;
+  font-size:10px;font-weight:600;color:var(--accent);
+  opacity:0;transition:opacity 0.15s;
+  background:var(--accent-l);padding:3px 7px;border-radius:20px;
+}
+.card:hover .card-ext{opacity:1;}
+
+/* Thumb colour palette — slightly muted for dark bg */
+.th-blue   {background:linear-gradient(135deg,#1e3a5f,#1e4976);}
+.th-green  {background:linear-gradient(135deg,#14532d,#166534);}
+.th-amber  {background:linear-gradient(135deg,#451a03,#78350f);}
+.th-red    {background:linear-gradient(135deg,#450a0a,#7f1d1d);}
+.th-purple {background:linear-gradient(135deg,#2e1065,#4c1d95);}
+.th-teal   {background:linear-gradient(135deg,#042f2e,#134e4a);}
+.th-pink   {background:linear-gradient(135deg,#500724,#831843);}
+.th-coral  {background:linear-gradient(135deg,#431407,#7c2d12);}
+.th-indigo {background:linear-gradient(135deg,#1e1b4b,#312e81);}
+.th-slate  {background:linear-gradient(135deg,#0f172a,#1e293b);}
+
+/* Home banner */
+.greeting{
+  border-radius:var(--radius-lg);
+  padding:22px 26px;margin-bottom:28px;
+  display:flex;align-items:center;gap:18px;
+  background:linear-gradient(135deg,#1e3a8a,#1d4ed8,#3b82f6);
+  color:#fff;position:relative;overflow:hidden;
+}
+.greeting::before{
+  content:'';position:absolute;top:-40px;right:-40px;
+  width:160px;height:160px;border-radius:50%;
+  background:rgba(255,255,255,0.07);
+}
+.greeting::after{
+  content:'';position:absolute;bottom:-30px;right:60px;
+  width:100px;height:100px;border-radius:50%;
+  background:rgba(255,255,255,0.05);
+}
+.greeting-emoji{font-size:44px;flex-shrink:0;z-index:1;}
+.greeting-text{z-index:1;}
+.greeting-text h2{font-size:19px;font-weight:700;margin-bottom:4px;letter-spacing:-0.3px;}
+.greeting-text p{font-size:13px;opacity:0.8;}
+
+@media(max-width:700px){
+  :root{--sidebar-w:200px;}
+  .cards{grid-template-columns:repeat(auto-fill,minmax(155px,1fr));}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- ══════════ SIDEBAR ══════════ -->
+<aside class="sidebar">
+  <div class="sb-logo">
+    <div class="sb-logo-icon"><i class="ti ti-antenna"></i></div>
+    <div>
+      <div class="sb-logo-text">Dispatcher's Internal Hub</div>
+      <div class="sb-logo-sub">Team Portal ✦</div>
+    </div>
+  </div>
+
+  <!-- Home -->
+  <div class="sb-section">
+    <div class="sb-item active" onclick="nav(this,'home','Home','')">
+      <i class="ti ti-home-2 nav-icon"></i> 🏠 Home
+    </div>
+  </div>
+
+  <!-- Schedule -->
+  <div class="sb-section">
+    <div class="sb-label">Scheduling</div>
+    <div class="sb-item" onclick="toggle(this,'g-sched')">
+      <i class="ti ti-calendar-event nav-icon"></i> 📅 Schedule
+      <i class="ti ti-chevron-right sb-chevron"></i>
+    </div>
+    <div class="sb-children" id="g-sched">
+      <div class="sb-sub" onclick="nav(this,'sched-timesheet','Timesheet','Schedule')">
+        <span class="sb-sub-dot"></span> ⏱️ Timesheet
+      </div>
+      <div class="sb-sub" onclick="nav(this,'sched-schedule','Schedule','Schedule')">
+        <span class="sb-sub-dot"></span> 🗓️ Schedule
+      </div>
+    </div>
+  </div>
+
+  <!-- Reports -->
+  <div class="sb-section">
+    <div class="sb-label">Reports</div>
+    <div class="sb-item" onclick="toggle(this,'g-reports')">
+      <i class="ti ti-chart-bar nav-icon"></i> 📊 Reports
+      <i class="ti ti-chevron-right sb-chevron"></i>
+    </div>
+    <div class="sb-children" id="g-reports">
+      <div class="sb-sub" onclick="nav(this,'rep-daily','Daily Reports','Reports')"><span class="sb-sub-dot"></span> 📋 Daily Reports</div>
+      <div class="sb-sub" onclick="nav(this,'rep-raw','Reports Raw Data','Reports')"><span class="sb-sub-dot"></span> 🗃️ Reports Raw Data</div>
+      <div class="sb-sub" onclick="nav(this,'rep-closed','Closed Reports','Reports')"><span class="sb-sub-dot"></span> ✅ Closed Reports</div>
+      <div class="sb-sub" onclick="nav(this,'rep-saved','Saved Jobs','Reports')"><span class="sb-sub-dot"></span> 🔖 Saved Jobs</div>
+      <div class="sb-sub" onclick="nav(this,'rep-validations','Validations','Reports')"><span class="sb-sub-dot"></span> 🛡️ Validations</div>
+      <div class="sb-sub" onclick="nav(this,'rep-closeddate','Jobs for Closed Date Monitoring','Reports')"><span class="sb-sub-dot"></span> 📅 Closed Date Monitoring</div>
+      <div class="sb-sub" onclick="nav(this,'rep-auditreport','Closed Jobs Audit Report','Reports')"><span class="sb-sub-dot"></span> 🔍 Closed Jobs Audit Report</div>
+      <div class="sb-sub" onclick="nav(this,'rep-audit','Closed Audit','Reports')"><span class="sb-sub-dot"></span> 📂 Closed Audit</div>
+    </div>
+  </div>
+
+  <!-- Tools -->
+  <div class="sb-section">
+    <div class="sb-label">Tools</div>
+    <div class="sb-item" onclick="toggle(this,'g-tools')">
+      <i class="ti ti-tool nav-icon"></i> 🔧 Tools
+      <i class="ti ti-chevron-right sb-chevron"></i>
+    </div>
+    <div class="sb-children" id="g-tools">
+      <div class="sb-sub" onclick="toggle2('g-forms')" style="color:#9ca3b0;font-weight:600">
+        <span class="sb-sub-dot"></span> ⚠️ Forms During Outage ›
+      </div>
+      <div class="sb-children" id="g-forms" style="padding-left:10px">
+        <div class="sb-sub" onclick="nav(this,'form-dp1','DP1 Form','Tools')"><span class="sb-sub-dot"></span> 📝 DP1 Form</div>
+        <div class="sb-sub" onclick="nav(this,'form-dp2','DP2 Form','Tools')"><span class="sb-sub-dot"></span> 📝 DP2 Form</div>
+        <div class="sb-sub" onclick="nav(this,'form-dp3','DP3 Form','Tools')"><span class="sb-sub-dot"></span> 📝 DP3 Form</div>
+        <div class="sb-sub" onclick="nav(this,'form-dp4','DP4 Form','Tools')"><span class="sb-sub-dot"></span> 📝 DP4 Form</div>
+        <div class="sb-sub" onclick="nav(this,'form-dp5','DP5 Form','Tools')"><span class="sb-sub-dot"></span> 📝 DP5 Form</div>
+        <div class="sb-sub" onclick="nav(this,'form-responses','Responses','Tools')"><span class="sb-sub-dot"></span> 📨 Responses</div>
+      </div>
+      <div class="sb-sub" onclick="nav(this,'tech-contacts','Technicians Contact','Tools')"><span class="sb-sub-dot"></span> 📒 Technicians Contact</div>
+      <div class="sb-sub" onclick="nav(this,'logins','Logins','Tools')"><span class="sb-sub-dot"></span> 🔐 Logins</div>
+      <div class="sb-sub" onclick="nav(this,'carkey-pricing','Car Key Pricing','Tools')"><span class="sb-sub-dot"></span> 🚗 Car Key Pricing</div>
+      <div class="sb-sub" onclick="nav(this,'sops','SOPs / Checklist','Tools')"><span class="sb-sub-dot"></span> 📌 SOPs / Checklist</div>
+      <div class="sb-sub" onclick="nav(this,'task-checklist','Task Checklist','Tools')"><span class="sb-sub-dot"></span> ☑️ Task Checklist</div>
+      <div class="sb-sub" onclick="nav(this,'task-owner','Task Owner','Tools')"><span class="sb-sub-dot"></span> 👤 Task Owner</div>
+      <div class="sb-sub" onclick="nav(this,'gmb-details','GMB Details','Tools')"><span class="sb-sub-dot"></span> 🗺️ GMB Details</div>
+    </div>
+  </div>
+
+  <!-- Learning Hub -->
+  <div class="sb-section">
+    <div class="sb-label">Learning</div>
+    <div class="sb-item" onclick="toggle(this,'g-learn')">
+      <i class="ti ti-school nav-icon"></i> 🎓 Learning Hub
+      <i class="ti ti-chevron-right sb-chevron"></i>
+    </div>
+    <div class="sb-children" id="g-learn">
+      <div class="sb-sub" onclick="nav(this,'learn-onboarding','Onboarding','Learning Hub')"><span class="sb-sub-dot"></span> 🚀 Onboarding</div>
+      <div class="sb-sub" onclick="nav(this,'learn-garage','Garage Door','Learning Hub')"><span class="sb-sub-dot"></span> 🏠 Garage Door</div>
+      <div class="sb-sub" onclick="nav(this,'learn-chimney','Chimney','Learning Hub')"><span class="sb-sub-dot"></span> 🔥 Chimney</div>
+      <div class="sb-sub" onclick="nav(this,'learn-carkey','Car Key Types','Learning Hub')"><span class="sb-sub-dot"></span> 🔑 Car Key Types</div>
+      <div class="sb-sub" onclick="nav(this,'learn-guides','Task Guides','Learning Hub')"><span class="sb-sub-dot"></span> 📖 Task Guides</div>
+      <div class="sb-sub" onclick="nav(this,'learn-videos','Videos','Learning Hub')"><span class="sb-sub-dot"></span> 🎬 Videos</div>
+    </div>
+  </div>
+
+  <!-- User footer -->
+  <div class="sb-user">
+    <div class="sb-avatar">DS</div>
+    <div>
+      <div class="sb-user-name">Dispatcher</div>
+      <div class="sb-user-role">Internal Portal</div>
+    </div>
+  </div>
+</aside>
+
+<!-- ══════════ MAIN ══════════ -->
+<div class="main">
+  <div class="topbar">
+    <div class="bc">
+      <span class="bc-parent" id="bc-p"></span>
+      <span class="bc-sep" id="bc-s"></span>
+      <span class="bc-current" id="bc-c">Home</span>
+    </div>
+    <div class="tb-time" id="clock"></div>
+  </div>
+
+  <div class="content">
+
+    <!-- ════ HOME ════ -->
+    <div class="view active" id="view-home">
+      <div class="greeting">
+        <div class="greeting-emoji">📡</div>
+        <div class="greeting-text">
+          <h2>Welcome to Dispatcher Hub</h2>
+          <p>Your central workspace — schedules, reports, tools & learning, all in one place.</p>
+        </div>
+      </div>
+
+      <!-- Schedule -->
+      <div class="section-group">
+        <div class="section-heading">📅 Schedule</div>
+        <div class="cards">
+          <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=1391968688#gid=1391968688')">
+            <div class="card-thumb th-blue">⏱️</div>
+            <div class="card-body"><div class="card-title">Timesheet</div><div class="card-sub">Log & review tech hours</div></div>
+            <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+          </div>
+          <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=1436791790#gid=1436791790')">
+            <div class="card-thumb th-green">🗓️</div>
+            <div class="card-body"><div class="card-title">Schedule</div><div class="card-sub">View & manage shifts</div></div>
+            <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reports -->
+      <div class="section-group">
+        <div class="section-heading">📊 Reports</div>
+        <div class="cards">
+          <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=53696395#gid=53696395')">
+            <div class="card-thumb th-amber">📋</div>
+            <div class="card-body"><div class="card-title">Daily Reports</div><div class="card-sub">Submit & view daily logs</div></div>
+            <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+          </div>
+          <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=0#gid=0')">
+            <div class="card-thumb th-coral">🗃️</div>
+            <div class="card-body"><div class="card-title">Reports Raw Data</div><div class="card-sub">Export & filter data</div></div>
+            <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+          </div>
+          <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=1578345541#gid=1578345541')">
+            <div class="card-thumb th-teal">✅</div>
+            <div class="card-body"><div class="card-title">Closed Reports</div><div class="card-sub">Archive of closed jobs</div></div>
+            <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+          </div>
+          <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=1073562725#gid=1073562725')">
+            <div class="card-thumb th-purple">🔖</div>
+            <div class="card-body"><div class="card-title">Saved Jobs</div><div class="card-sub">Bookmarked entries</div></div>
+            <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+          </div>
+          <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=789487622#gid=789487622')">
+            <div class="card-thumb th-pink">🛡️</div>
+            <div class="card-body"><div class="card-title">Validations</div><div class="card-sub">Verify & approve entries</div></div>
+            <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+          </div>
+          <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=1178215777#gid=1178215777')">
+            <div class="card-thumb th-indigo">📅</div>
+            <div class="card-body"><div class="card-title">Jobs for Closed Date Monitoring</div><div class="card-sub">Track jobs by closed date</div></div>
+            <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+          </div>
+          <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=1747953786#gid=1747953786')">
+            <div class="card-thumb th-slate">🔍</div>
+            <div class="card-body"><div class="card-title">Closed Jobs Audit Report</div><div class="card-sub">Audit closed job entries</div></div>
+            <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+          </div>
+          <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=1747953786#gid=1747953786')">
+            <div class="card-thumb th-green">📂</div>
+            <div class="card-body"><div class="card-title">Closed Audit</div><div class="card-sub">Closed job audit log</div></div>
+            <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tools -->
+      <div class="section-group">
+        <div class="section-heading">🔧 Tools</div>
+        <div class="cards">
+          <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=2092837945#gid=2092837945')">
+            <div class="card-thumb th-red">📝</div>
+            <div class="card-body"><div class="card-title">DP1 Form</div><div class="card-sub">During outage — Level 1</div></div>
+            <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+          </div>
+          <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=2092837945#gid=2092837945')">
+            <div class="card-thumb th-red">📝</div>
+            <div class="card-body"><div class="card-title">DP2 Form</div><div class="card-sub">During outage — Level 2</div></div>
+            <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+          </div>
+          <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=2092837945#gid=2092837945')">
+            <div class="card-thumb th-red">📝</div>
+            <div class="card-body"><div class="card-title">DP3 Form</div><div class="card-sub">During outage — Level 3</div></div>
+            <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+          </div>
+          <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=2092837945#gid=2092837945')">
+            <div class="card-thumb th-red">📝</div>
+            <div class="card-body"><div class="card-title">DP4 Form</div><div class="card-sub">During outage — Level 4</div></div>
+            <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+          </div>
+          <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=2092837945#gid=2092837945')">
+            <div class="card-thumb th-red">📝</div>
+            <div class="card-body"><div class="card-title">DP5 Form</div><div class="card-sub">During outage — Level 5</div></div>
+            <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+          </div>
+          <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=2092837945#gid=2092837945')">
+            <div class="card-thumb th-blue">📨</div>
+            <div class="card-body"><div class="card-title">Responses</div><div class="card-sub">All form submissions</div></div>
+            <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+          </div>
+          <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=2092837945#gid=2092837945')">
+            <div class="card-thumb th-indigo">📒</div>
+            <div class="card-body"><div class="card-title">Technicians Contact</div><div class="card-sub">Phone, zone & info</div></div>
+            <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+          </div>
+          <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=2092837945#gid=2092837945')">
+            <div class="card-thumb th-amber">🔐</div>
+            <div class="card-body"><div class="card-title">Logins</div><div class="card-sub">System credentials</div></div>
+            <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+          </div>
+          <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=2092837945#gid=2092837945')">
+            <div class="card-thumb th-green">🚗</div>
+            <div class="card-body"><div class="card-title">Car Key Pricing</div><div class="card-sub">Price guide by make/model</div></div>
+            <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+          </div>
+          <div class="card" onclick="openLink('YOUR_SOPS_LINK')">
+            <div class="card-thumb th-teal">📌</div>
+            <div class="card-body"><div class="card-title">SOPs / Checklist</div><div class="card-sub">Standard procedures</div></div>
+            <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+          </div>
+          <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=2092837945#gid=2092837945')">
+            <div class="card-thumb th-purple">☑️</div>
+            <div class="card-body"><div class="card-title">Task Checklist</div><div class="card-sub">Daily task tracker</div></div>
+            <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+          </div>
+          <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=2092837945#gid=2092837945')">
+            <div class="card-thumb th-coral">👤</div>
+            <div class="card-body"><div class="card-title">Task Owner</div><div class="card-sub">Ownership & accountability</div></div>
+            <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+          </div>
+          <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=1459384409#gid=1459384409')">
+            <div class="card-thumb th-teal">🗺️</div>
+            <div class="card-body"><div class="card-title">GMB Details</div><div class="card-sub">Google My Business info</div></div>
+            <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Learning Hub -->
+      <div class="section-group">
+        <div class="section-heading">🎓 Learning Hub</div>
+        <div class="cards">
+          <div class="card" onclick="openLink('https://docs.google.com/presentation/d/1zBK4YhxXwO8r0s29oF7JEmawznm2Utta/edit?usp=sharing&ouid=112118230275761920745&rtpof=true&sd=true')">
+            <div class="card-thumb th-blue">🚀</div>
+            <div class="card-body"><div class="card-title">Onboarding</div><div class="card-sub">New hire training</div></div>
+            <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+          </div>
+          <div class="card" onclick="openLink('https://docs.google.com/presentation/d/1UNmfoJoWVSmqOpSvko8WV-Ou7SUEWfZp/edit?usp=drive_link&ouid=112118230275761920745&rtpof=true&sd=true')">
+            <div class="card-thumb th-amber">🏠</div>
+            <div class="card-body"><div class="card-title">Garage Door</div><div class="card-sub">Service knowledge base</div></div>
+            <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+          </div>
+          <div class="card" onclick="openLink('https://docs.google.com/presentation/d/1rTO7RsoOZ8LxhgS5F53Ay23mT6hLgNYG/edit?usp=drive_link&ouid=112118230275761920745&rtpof=true&sd=true')">
+            <div class="card-thumb th-coral">🔥</div>
+            <div class="card-body"><div class="card-title">Chimney</div><div class="card-sub">Service knowledge base</div></div>
+            <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+          </div>
+          <div class="card" onclick="openLink('https://docs.google.com/presentation/d/1lF4kSBw5hdkxUV-Rr-vOSXxyh41hXjkE/edit?usp=sharing&ouid=112118230275761920745&rtpof=true&sd=true')">
+            <div class="card-thumb th-green">🔑</div>
+            <div class="card-body"><div class="card-title">Car Key Types</div><div class="card-sub">Key identification guide</div></div>
+            <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+          </div>
+          <div class="card" onclick="openLink('https://docs.google.com/presentation/d/1KP1lULK0beAPBqJm4jVC5CneHYiUsynz/edit?usp=drive_link&ouid=112118230275761920745&rtpof=true&sd=true')">
+            <div class="card-thumb th-teal">📖</div>
+            <div class="card-body"><div class="card-title">Task Guides</div><div class="card-sub">Step-by-step references</div></div>
+            <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+          </div>
+          <div class="card" onclick="openLink('https://www.loom.com/share/38891749d4084937b665617888c40664')">
+            <div class="card-thumb th-pink">🎬</div>
+            <div class="card-body"><div class="card-title">Videos</div><div class="card-sub">Training video library</div></div>
+            <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+          </div>
+        </div>
+      </div>
+    </div><!-- /home -->
+
+    <!-- ════ SCHEDULE: TIMESHEET ════ -->
+    <div class="view" id="view-sched-timesheet">
+      <div class="page-header"><div class="page-title">Timesheet</div><div class="page-sub">Log and review technician hours.</div></div>
+      <div class="cards">
+        <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=1391968688#gid=1391968688')">
+          <div class="card-thumb th-blue">⏱️</div>
+          <div class="card-body"><div class="card-title">Open Timesheet</div><div class="card-sub">Google Sheets → opens in new tab</div></div>
+          <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ SCHEDULE: SCHEDULE ════ -->
+    <div class="view" id="view-sched-schedule">
+      <div class="page-header"><div class="page-title">Schedule</div><div class="page-sub">View and manage technician shifts.</div></div>
+      <div class="cards">
+        <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=1436791790#gid=1436791790')">
+          <div class="card-thumb th-green">🗓️</div>
+          <div class="card-body"><div class="card-title">Open Schedule</div><div class="card-sub">Google Sheets → opens in new tab</div></div>
+          <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ REPORTS ════ -->
+    <div class="view" id="view-rep-daily">
+      <div class="page-header"><div class="page-title">Daily Reports</div><div class="page-sub">Submit and review daily dispatcher reports.</div></div>
+      <div class="cards">
+        <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=53696395#gid=53696395')">
+          <div class="card-thumb th-amber">📋</div>
+          <div class="card-body"><div class="card-title">Open Daily Reports</div><div class="card-sub">Google Sheets → opens in new tab</div></div>
+          <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+        </div>
+      </div>
+    </div>
+    <div class="view" id="view-rep-raw">
+      <div class="page-header"><div class="page-title">Reports Raw Data</div><div class="page-sub">Unfiltered data for analysis and export.</div></div>
+      <div class="cards">
+        <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=0#gid=0')">
+          <div class="card-thumb th-coral">🗃️</div>
+          <div class="card-body"><div class="card-title">Open Raw Data</div><div class="card-sub">Google Sheets → opens in new tab</div></div>
+          <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+        </div>
+      </div>
+    </div>
+    <div class="view" id="view-rep-closed">
+      <div class="page-header"><div class="page-title">Closed Reports</div><div class="page-sub">Archive of all resolved and closed job reports.</div></div>
+      <div class="cards">
+        <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=1578345541#gid=1578345541')">
+          <div class="card-thumb th-teal">✅</div>
+          <div class="card-body"><div class="card-title">Open Closed Reports</div><div class="card-sub">Google Sheets → opens in new tab</div></div>
+          <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+        </div>
+      </div>
+    </div>
+    <div class="view" id="view-rep-saved">
+      <div class="page-header"><div class="page-title">Saved Jobs</div><div class="page-sub">Jobs bookmarked for follow-up or reference.</div></div>
+      <div class="cards">
+        <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=1073562725#gid=1073562725')">
+          <div class="card-thumb th-purple">🔖</div>
+          <div class="card-body"><div class="card-title">Open Saved Jobs</div><div class="card-sub">Google Sheets → opens in new tab</div></div>
+          <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+        </div>
+      </div>
+    </div>
+    <div class="view" id="view-rep-validations">
+      <div class="page-header"><div class="page-title">Validations</div><div class="page-sub">Review and approve pending job validations.</div></div>
+      <div class="cards">
+        <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=789487622#gid=789487622')">
+          <div class="card-thumb th-pink">🛡️</div>
+          <div class="card-body"><div class="card-title">Open Validations</div><div class="card-sub">Google Sheets → opens in new tab</div></div>
+          <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+        </div>
+      </div>
+    </div>
+    <div class="view" id="view-rep-closeddate">
+      <div class="page-header"><div class="page-title">Jobs for Closed Date Monitoring</div><div class="page-sub">Track and monitor jobs by their closed date.</div></div>
+      <div class="cards">
+        <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=1178215777#gid=1178215777')">
+          <div class="card-thumb th-indigo">📅</div>
+          <div class="card-body"><div class="card-title">Open Closed Date Monitoring</div><div class="card-sub">Google Sheets → opens in new tab</div></div>
+          <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+        </div>
+      </div>
+    </div>
+    <div class="view" id="view-rep-auditreport">
+      <div class="page-header"><div class="page-title">Closed Jobs Audit Report</div><div class="page-sub">Full audit report of all closed job entries.</div></div>
+      <div class="cards">
+        <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=1747953786#gid=1747953786')">
+          <div class="card-thumb th-slate">🔍</div>
+          <div class="card-body"><div class="card-title">Open Closed Jobs Audit Report</div><div class="card-sub">Google Sheets → opens in new tab</div></div>
+          <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+        </div>
+      </div>
+    </div>
+    <div class="view" id="view-rep-audit">
+      <div class="page-header"><div class="page-title">Closed Audit</div><div class="page-sub">Closed job audit log.</div></div>
+      <div class="cards">
+        <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=1747953786#gid=1747953786')">
+          <div class="card-thumb th-green">📂</div>
+          <div class="card-body"><div class="card-title">Open Closed Audit</div><div class="card-sub">Google Sheets → opens in new tab</div></div>
+          <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ TOOLS: FORMS ════ -->
+    <div class="view" id="view-form-dp1">
+      <div class="page-header"><div class="page-title">DP1 Form</div><div class="page-sub">Dispatch Protocol 1 — During outage use only.</div></div>
+      <div class="cards">
+        <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=2092837945#gid=2092837945')">
+          <div class="card-thumb th-red">📝</div>
+          <div class="card-body"><div class="card-title">Open DP1 Form</div><div class="card-sub">Google Sheets → opens in new tab</div></div>
+          <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+        </div>
+      </div>
+    </div>
+    <div class="view" id="view-form-dp2">
+      <div class="page-header"><div class="page-title">DP2 Form</div><div class="page-sub">Dispatch Protocol 2 — During outage use only.</div></div>
+      <div class="cards">
+        <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=2092837945#gid=2092837945')">
+          <div class="card-thumb th-red">📝</div>
+          <div class="card-body"><div class="card-title">Open DP2 Form</div><div class="card-sub">Google Sheets → opens in new tab</div></div>
+          <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+        </div>
+      </div>
+    </div>
+    <div class="view" id="view-form-dp3">
+      <div class="page-header"><div class="page-title">DP3 Form</div><div class="page-sub">Dispatch Protocol 3 — During outage use only.</div></div>
+      <div class="cards">
+        <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=2092837945#gid=2092837945')">
+          <div class="card-thumb th-red">📝</div>
+          <div class="card-body"><div class="card-title">Open DP3 Form</div><div class="card-sub">Google Sheets → opens in new tab</div></div>
+          <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+        </div>
+      </div>
+    </div>
+    <div class="view" id="view-form-dp4">
+      <div class="page-header"><div class="page-title">DP4 Form</div><div class="page-sub">Dispatch Protocol 4 — During outage use only.</div></div>
+      <div class="cards">
+        <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=2092837945#gid=2092837945')">
+          <div class="card-thumb th-red">📝</div>
+          <div class="card-body"><div class="card-title">Open DP4 Form</div><div class="card-sub">Google Sheets → opens in new tab</div></div>
+          <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+        </div>
+      </div>
+    </div>
+    <div class="view" id="view-form-dp5">
+      <div class="page-header"><div class="page-title">DP5 Form</div><div class="page-sub">Dispatch Protocol 5 — During outage use only.</div></div>
+      <div class="cards">
+        <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=2092837945#gid=2092837945')">
+          <div class="card-thumb th-red">📝</div>
+          <div class="card-body"><div class="card-title">Open DP5 Form</div><div class="card-sub">Google Sheets → opens in new tab</div></div>
+          <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+        </div>
+      </div>
+    </div>
+    <div class="view" id="view-form-responses">
+      <div class="page-header"><div class="page-title">Responses</div><div class="page-sub">All submitted outage form responses.</div></div>
+      <div class="cards">
+        <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=2092837945#gid=2092837945')">
+          <div class="card-thumb th-blue">📨</div>
+          <div class="card-body"><div class="card-title">Open Responses</div><div class="card-sub">Google Sheets → opens in new tab</div></div>
+          <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ TOOLS: REST ════ -->
+    <div class="view" id="view-tech-contacts">
+      <div class="page-header"><div class="page-title">Technicians Contact</div><div class="page-sub">All technician contact details and zone assignments.</div></div>
+      <div class="cards">
+        <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=2092837945#gid=2092837945')">
+          <div class="card-thumb th-indigo">📒</div>
+          <div class="card-body"><div class="card-title">Open Tech Contacts</div><div class="card-sub">Google Sheets → opens in new tab</div></div>
+          <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+        </div>
+      </div>
+    </div>
+    <div class="view" id="view-logins">
+      <div class="page-header"><div class="page-title">Logins</div><div class="page-sub">System and tool credentials for authorized staff.</div></div>
+      <div class="cards">
+        <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=2092837945#gid=2092837945')">
+          <div class="card-thumb th-amber">🔐</div>
+          <div class="card-body"><div class="card-title">Open Logins</div><div class="card-sub">Google Sheets → opens in new tab</div></div>
+          <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+        </div>
+      </div>
+    </div>
+    <div class="view" id="view-carkey-pricing">
+      <div class="page-header"><div class="page-title">Car Key Pricing</div><div class="page-sub">Pricing guide by vehicle make, model, and key type.</div></div>
+      <div class="cards">
+        <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=2092837945#gid=2092837945')">
+          <div class="card-thumb th-green">🚗</div>
+          <div class="card-body"><div class="card-title">Open Car Key Pricing</div><div class="card-sub">Google Sheets → opens in new tab</div></div>
+          <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+        </div>
+      </div>
+    </div>
+    <div class="view" id="view-sops">
+      <div class="page-header"><div class="page-title">SOPs / Checklist</div><div class="page-sub">Standard operating procedures and process checklists.</div></div>
+      <div class="cards">
+        <div class="card" onclick="openLink('YOUR_SOPS_LINK')">
+          <div class="card-thumb th-teal">📌</div>
+          <div class="card-body"><div class="card-title">Open SOPs / Checklist</div><div class="card-sub">Opens in new tab</div></div>
+          <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+        </div>
+      </div>
+    </div>
+    <div class="view" id="view-task-checklist">
+      <div class="page-header"><div class="page-title">Task Checklist</div><div class="page-sub">Track your daily and recurring task completion.</div></div>
+      <div class="cards">
+        <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=2092837945#gid=2092837945')">
+          <div class="card-thumb th-purple">☑️</div>
+          <div class="card-body"><div class="card-title">Open Task Checklist</div><div class="card-sub">Google Sheets → opens in new tab</div></div>
+          <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+        </div>
+      </div>
+    </div>
+    <div class="view" id="view-task-owner">
+      <div class="page-header"><div class="page-title">Task Owner</div><div class="page-sub">Assign ownership and accountability for all tasks.</div></div>
+      <div class="cards">
+        <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=2092837945#gid=2092837945')">
+          <div class="card-thumb th-coral">👤</div>
+          <div class="card-body"><div class="card-title">Open Task Owner</div><div class="card-sub">Google Sheets → opens in new tab</div></div>
+          <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+        </div>
+      </div>
+    </div>
+    <div class="view" id="view-gmb-details">
+      <div class="page-header"><div class="page-title">GMB Details</div><div class="page-sub">Google My Business details and information.</div></div>
+      <div class="cards">
+        <div class="card" onclick="openLink('https://docs.google.com/spreadsheets/d/1v1fS2Y2QY1238_Oyu8cWDVhDIQLKL6I4GIMslL24fhQ/edit?gid=1459384409#gid=1459384409')">
+          <div class="card-thumb th-teal">🗺️</div>
+          <div class="card-body"><div class="card-title">Open GMB Details</div><div class="card-sub">Google Sheets → opens in new tab</div></div>
+          <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ LEARNING HUB ════ -->
+    <div class="view" id="view-learn-onboarding">
+      <div class="page-header"><div class="page-title">Onboarding</div><div class="page-sub">New hire orientation and training materials.</div></div>
+      <div class="cards">
+        <div class="card" onclick="openLink('https://docs.google.com/presentation/d/1zBK4YhxXwO8r0s29oF7JEmawznm2Utta/edit?usp=sharing&ouid=112118230275761920745&rtpof=true&sd=true')">
+          <div class="card-thumb th-blue">🚀</div>
+          <div class="card-body"><div class="card-title">Open Onboarding</div><div class="card-sub">Google Slides → opens in new tab</div></div>
+          <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+        </div>
+      </div>
+    </div>
+    <div class="view" id="view-learn-garage">
+      <div class="page-header"><div class="page-title">Garage Door</div><div class="page-sub">Service knowledge base for garage door jobs.</div></div>
+      <div class="cards">
+        <div class="card" onclick="openLink('https://docs.google.com/presentation/d/1UNmfoJoWVSmqOpSvko8WV-Ou7SUEWfZp/edit?usp=drive_link&ouid=112118230275761920745&rtpof=true&sd=true')">
+          <div class="card-thumb th-amber">🏠</div>
+          <div class="card-body"><div class="card-title">Open Garage Door Guide</div><div class="card-sub">Google Slides → opens in new tab</div></div>
+          <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+        </div>
+      </div>
+    </div>
+    <div class="view" id="view-learn-chimney">
+      <div class="page-header"><div class="page-title">Chimney</div><div class="page-sub">Service knowledge base for chimney jobs.</div></div>
+      <div class="cards">
+        <div class="card" onclick="openLink('https://docs.google.com/presentation/d/1rTO7RsoOZ8LxhgS5F53Ay23mT6hLgNYG/edit?usp=drive_link&ouid=112118230275761920745&rtpof=true&sd=true')">
+          <div class="card-thumb th-coral">🔥</div>
+          <div class="card-body"><div class="card-title">Open Chimney Guide</div><div class="card-sub">Google Slides → opens in new tab</div></div>
+          <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+        </div>
+      </div>
+    </div>
+    <div class="view" id="view-learn-carkey">
+      <div class="page-header"><div class="page-title">Car Key Types</div><div class="page-sub">Identification guide for all key types handled by techs.</div></div>
+      <div class="cards">
+        <div class="card" onclick="openLink('https://docs.google.com/presentation/d/1lF4kSBw5hdkxUV-Rr-vOSXxyh41hXjkE/edit?usp=sharing&ouid=112118230275761920745&rtpof=true&sd=true')">
+          <div class="card-thumb th-green">🔑</div>
+          <div class="card-body"><div class="card-title">Open Car Key Types</div><div class="card-sub">Google Slides → opens in new tab</div></div>
+          <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+        </div>
+      </div>
+    </div>
+    <div class="view" id="view-learn-guides">
+      <div class="page-header"><div class="page-title">Task Guides</div><div class="page-sub">Step-by-step reference guides for all common tasks.</div></div>
+      <div class="cards">
+        <div class="card" onclick="openLink('https://docs.google.com/presentation/d/1KP1lULK0beAPBqJm4jVC5CneHYiUsynz/edit?usp=drive_link&ouid=112118230275761920745&rtpof=true&sd=true')">
+          <div class="card-thumb th-teal">📖</div>
+          <div class="card-body"><div class="card-title">Open Task Guides</div><div class="card-sub">Google Slides → opens in new tab</div></div>
+          <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+        </div>
+      </div>
+    </div>
+    <div class="view" id="view-learn-videos">
+      <div class="page-header"><div class="page-title">Videos</div><div class="page-sub">Training and reference video library.</div></div>
+      <div class="cards">
+        <div class="card" onclick="openLink('https://www.loom.com/share/38891749d4084937b665617888c40664')">
+          <div class="card-thumb th-pink">🎬</div>
+          <div class="card-body"><div class="card-title">Open Videos</div><div class="card-sub">Loom → opens in new tab</div></div>
+          <div class="card-ext"><i class="ti ti-external-link"></i> Open</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+</div><!-- /layout -->
+
+<script>
+function nav(el, viewId, title, parent) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const t = document.getElementById('view-' + viewId);
+  if (t) t.classList.add('active');
+  document.getElementById('bc-c').textContent = title;
+  const bp = document.getElementById('bc-p'), bs = document.getElementById('bc-s');
+  if (parent) { bp.textContent = parent; bs.textContent = '›'; }
+  else { bp.textContent = ''; bs.textContent = ''; }
+  document.querySelectorAll('.sb-item, .sb-sub').forEach(i => i.classList.remove('active'));
+  if (el) el.classList.add('active');
+  window.scrollTo && window.scrollTo(0,0);
+}
+
+function toggle(el, gId) {
+  const g = document.getElementById(gId);
+  const wasOpen = g.classList.contains('open');
+  document.querySelectorAll('.sb-children').forEach(x => { if(x.id !== 'g-forms') x.classList.remove('open'); });
+  document.querySelectorAll('.sb-item').forEach(x => x.classList.remove('open'));
+  if (!wasOpen) { g.classList.add('open'); el.classList.add('open'); }
+}
+
+function toggle2(gId) {
+  document.getElementById(gId).classList.toggle('open');
+}
+
+function openLink(url) {
+  if (url.startsWith('YOUR_')) {
+    alert('📌 Add your link: replace "' + url + '" in the HTML file.');
+    return;
+  }
+  window.open(url, '_blank');
+}
+
+// Live clock
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+}
+updateClock();
+setInterval(updateClock, 1000);
+</script>
+</body>
+</html>
